@@ -127,6 +127,7 @@
     height: 100vh; gap: 16px;
   }
   .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  .spinner-sm { width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; vertical-align: middle; margin-right: 6px; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
   /* ── APP ─────────────────────────────────────────────────── */
@@ -151,7 +152,10 @@
   .obra-name-desc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .header-sub   { font-size: 0.68rem; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-  .last-update  { font-size: 0.68rem; color: var(--muted); text-align: right; line-height: 1.5; white-space: nowrap; }
+  .header-info-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .header-info-line > *:not(:last-child)::after { content: '·'; margin-left: 6px; color: var(--border); font-weight: 400; }
+  .last-update  { font-size: 0.68rem; color: var(--muted); text-align: right; white-space: nowrap; }
+  .header-meta-line { display: flex; align-items: center; gap: 10px; }
   .header-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
   .user-badge   { font-size: 0.68rem; color: var(--surface); background: var(--accent); padding: 2px 10px; border-radius: 10px; white-space: nowrap; cursor: default; }
   .admin-badge  { font-size: 0.68rem; color: var(--surface); background: var(--admin); padding: 2px 10px; border-radius: 10px; white-space: nowrap; cursor: pointer; }
@@ -738,7 +742,7 @@
     <div class="login-logo">&#127959; ClimaObra</div>
     <div class="login-sub">Sistema de registro climatico para obra</div>
     <div id="g-btn-wrap"></div>
-    <div class="login-ver">v16.0.0</div>
+    <div class="login-ver">v16.0.1</div>
   </div>
 </div>
 
@@ -812,9 +816,11 @@
             <div class="header-sub" id="header-sub">-</div>
           </div>
           <div class="header-right">
-            <div class="last-update" id="last-update">-</div>
-            <div class="update-status" id="update-status"></div>
-            <div class="next-update" id="next-update"></div>
+            <div class="header-info-line">
+              <span class="last-update" id="last-update">-</span>
+              <span class="update-status" id="update-status"></span>
+              <span class="next-update" id="next-update"></span>
+            </div>
             <div class="header-actions">
               <button class="btn-header" id="btn-install" onclick="instalarPWA()" style="display:none">&#128187; Instalar</button>
               <button class="btn-refresh btn-header" id="btn-refresh" onclick="actualizarDatos('manual')">
@@ -829,9 +835,10 @@
               <div class="user-badge" id="user-badge">-</div>
               <div class="admin-badge" id="admin-badge" onclick="abrirAdmin()" style="display:none">&#9881; Admin</div>
             </div>
-            <span id="desktop-version" style="font-size:0.62rem;color:var(--muted);white-space:nowrap;"></span>
-
-            <button class="btn-signout" onclick="cerrarSesion()">Cerrar sesion</button>
+            <div class="header-meta-line">
+              <span id="desktop-version" style="font-size:0.62rem;color:var(--muted);white-space:nowrap;"></span>
+              <button class="btn-signout" onclick="cerrarSesion()">Cerrar sesion</button>
+            </div>
           </div>
         </div>
         <div id="cards-row">
@@ -952,13 +959,15 @@
 
     <div class="main-tab-panel" id="panel-historico">
       <div class="section">
-        <div class="section-title">HISTORICO <span>detalle horario por dia</span></div>
-        <div class="hist-meses" id="hist-meses"></div>
-        <div class="hist-dias-scroll">
-          <div class="hist-dias-wrap" id="hist-dias-wrap"></div>
+        <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+          <div class="section-title" style="margin-bottom:0;">HISTORICO <span>detalle horario por dia</span></div>
+          <div class="ultimo-dia-fecha" id="hist-dia-fecha" style="margin-bottom:0;font-size:0.95rem;">-</div>
         </div>
-        <div class="ultimo-dia-fecha" id="hist-dia-fecha" style="margin-top:10px;">-</div>
-        <div class="chart-box" id="hist-chart-box" style="margin-top:8px;">
+        <div class="hist-meses" id="hist-meses" style="margin-bottom:8px;"></div>
+        <div class="hist-dias-scroll" style="padding-bottom:2px;">
+          <div class="hist-dias-wrap" id="hist-dias-wrap" style="padding:2px 0 4px;"></div>
+        </div>
+        <div class="chart-box" id="hist-chart-box" style="margin-top:6px;">
           <div class="chart-wrap"><canvas id="chartHistorico"></canvas></div>
           <div class="hist-legend" id="hist-legend"></div>
         </div>
@@ -1219,7 +1228,7 @@
 // ── CONFIGURACION ─────────────────────────────────────────────
 var CLIENT_ID   = '174536806740-aus6npjphhdcn5nkgtt1ejl0tcj16ou7.apps.googleusercontent.com';
 var API_URL     = 'https://script.google.com/macros/s/AKfycbzH5slzkOQ8fvhCt9JXIoMFNxrBZghZv34fowPI2Yk948eTxhZmHFX37InwpnxmkVBU/exec';
-var VERSION_UI  = 'v16.0.0';
+var VERSION_UI  = 'v16.0.1';
 // ─────────────────────────────────────────────────────────────
 
 var chart7Instance      = null;
@@ -1470,7 +1479,7 @@ function actualizarDatos(tipo) {
 
 function actualizarVistaDatos(data) {
   if (data.ultimo) {
-    document.getElementById('last-update').innerHTML = 'Ultimo registro<br><strong>' + data.ultimo.timestamp + '</strong>';
+    document.getElementById('last-update').innerHTML = 'Ultimo registro: <strong>' + data.ultimo.timestamp + '</strong>';
     renderTarjetas(data.ultimo);
   }
   globalAnual       = data.anual;
@@ -1623,7 +1632,7 @@ function iniciarDashboard(data) {
   }
 
   if (data.ultimo) {
-    document.getElementById('last-update').innerHTML = 'Ultimo registro<br><strong>' + data.ultimo.timestamp + '</strong>';
+    document.getElementById('last-update').innerHTML = 'Ultimo registro: <strong>' + data.ultimo.timestamp + '</strong>';
     renderTarjetas(data.ultimo);
   }
 
@@ -2034,7 +2043,7 @@ function seleccionarDiaHistorico(fecha) {
     return;
   }
 
-  document.getElementById('hist-legend').innerHTML = '<span style="font-size:0.75rem;color:var(--muted);">Cargando...</span>';
+  document.getElementById('hist-legend').innerHTML = '<span style="font-size:0.75rem;color:var(--muted);display:flex;align-items:center;"><span class="spinner-sm"></span>Cargando...</span>';
   fetch(API_URL + '?action=horasDia&email=' + encodeURIComponent(userEmail) + '&obraId=' + obraSeleccionada.id + '&fecha=' + fecha)
     .then(function(r) { return r.json(); })
     .then(function(data) {
