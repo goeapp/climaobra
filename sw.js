@@ -1,9 +1,9 @@
 // ============================================================
 //  ClimaObra — Service Worker
-//  v11 — Multi-obra PWA
+//  v16 — Multi-obra PWA
 // ============================================================
 
-const CACHE_NAME = 'climaobra-v11';
+const CACHE_NAME = 'climaobra-v16';
 
 // Archivos a cachear en la instalación
 const ASSETS = [

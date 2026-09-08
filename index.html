@@ -310,6 +310,37 @@
   .uptime-ley-item { display: flex; align-items: center; gap: 5px; font-size: 0.7rem; color: var(--muted); }
   .uptime-ley-dot  { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
 
+  /* ── TABS PRINCIPALES (Ahora / Historico) ──────────────────── */
+  .main-tabs       { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 2px solid var(--border); }
+  .main-tab        { padding: 8px 18px; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.5px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
+  .main-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .main-tab-panel  { display: none; }
+  .main-tab-panel.active { display: block; }
+
+  /* ── HISTORICO — selector de mes ───────────────────────────── */
+  .hist-meses      { display: flex; gap: 7px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 4px; }
+  .hist-mes-btn    { padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-size: 0.7rem; cursor: pointer; font-family: 'DM Sans', sans-serif; white-space: nowrap; transition: all 0.18s; box-shadow: var(--shadow); }
+  .hist-mes-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* ── HISTORICO — tira de dias del mes ──────────────────────── */
+  .hist-dias-scroll { overflow-x: auto; padding-bottom: 6px; }
+  .hist-dias-wrap  { display: flex; gap: 3px; min-width: max-content; padding: 4px 0 6px; }
+  .hist-dia        { width: 26px; height: 32px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: 700; color: #fff; transition: opacity 0.15s, transform 0.1s; flex-shrink: 0; }
+  .hist-dia:hover  { opacity: 0.8; transform: translateY(-2px); }
+  .hist-dia.hist-dia-selected { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .hist-dia-normal    { background: #16a34a; }
+  .hist-dia-perdido   { background: #dc2626; }
+  .hist-dia-sinDatos  { background: #e2e8f0; color: var(--muted); cursor: default; }
+  .hist-dia-sinDatos:hover { opacity: 1; transform: none; }
+
+  /* ── HISTORICO — leyenda filtrable del grafico ─────────────── */
+  .hist-legend      { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; }
+  .hist-legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--muted); cursor: pointer; user-select: none; transition: opacity 0.15s; }
+  .hist-legend-item.hist-legend-off { opacity: 0.35; }
+  .hist-legend-dot  { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .hist-legend-dot.hist-legend-dash { border-radius: 0; height: 2px; width: 14px; }
+  .hist-vacio       { color: var(--muted); font-size: 0.8rem; padding: 30px 10px; text-align: center; }
+
   #dias-y-grafico { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
   #ultimo-dia-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; }
   .ultimo-dia-title { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
@@ -707,7 +738,7 @@
     <div class="login-logo">&#127959; ClimaObra</div>
     <div class="login-sub">Sistema de registro climatico para obra</div>
     <div id="g-btn-wrap"></div>
-    <div class="login-ver">v15.0</div>
+    <div class="login-ver">v16.0.0</div>
   </div>
 </div>
 
@@ -843,6 +874,13 @@
 
   <div id="scroll-area">
     <div class="divider"></div>
+
+    <div class="main-tabs">
+      <div class="main-tab active" id="mtab-principal-ahora" onclick="cambiarTabPrincipal('ahora')">Ahora</div>
+      <div class="main-tab" id="mtab-principal-historico" onclick="cambiarTabPrincipal('historico')">Historico</div>
+    </div>
+
+    <div class="main-tab-panel active" id="panel-ahora">
     <div class="section">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
         <div class="section-title" style="margin-bottom:0;">PERIODO</div>
@@ -910,6 +948,23 @@
         <div class="perdidos-total" id="pd-config">-</div>
       </div>
     </div>
+    </div><!-- /panel-ahora -->
+
+    <div class="main-tab-panel" id="panel-historico">
+      <div class="section">
+        <div class="section-title">HISTORICO <span>detalle horario por dia</span></div>
+        <div class="hist-meses" id="hist-meses"></div>
+        <div class="hist-dias-scroll">
+          <div class="hist-dias-wrap" id="hist-dias-wrap"></div>
+        </div>
+        <div class="ultimo-dia-fecha" id="hist-dia-fecha" style="margin-top:10px;">-</div>
+        <div class="chart-box" id="hist-chart-box" style="margin-top:8px;">
+          <div class="chart-wrap"><canvas id="chartHistorico"></canvas></div>
+          <div class="hist-legend" id="hist-legend"></div>
+        </div>
+      </div>
+    </div><!-- /panel-historico -->
+
   </div>
 </div>
 
@@ -1052,6 +1107,10 @@
       <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
       Anual
     </button>
+    <button class="tab-btn" id="mtab-historico" onclick="cambiarTabMobile('historico')">
+      <svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+      Historico
+    </button>
     <button class="tab-btn" id="mtab-admin" onclick="abrirAdmin()" id="mtab-admin-btn" style="display:none">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
       Admin
@@ -1160,7 +1219,7 @@
 // ── CONFIGURACION ─────────────────────────────────────────────
 var CLIENT_ID   = '174536806740-aus6npjphhdcn5nkgtt1ejl0tcj16ou7.apps.googleusercontent.com';
 var API_URL     = 'https://script.google.com/macros/s/AKfycbzH5slzkOQ8fvhCt9JXIoMFNxrBZghZv34fowPI2Yk948eTxhZmHFX37InwpnxmkVBU/exec';
-var VERSION_UI  = 'v15.0';
+var VERSION_UI  = 'v16.0.0';
 // ─────────────────────────────────────────────────────────────
 
 var chart7Instance      = null;
@@ -1185,6 +1244,12 @@ var INTERVALO_AUTO_MIN  = 60;
 var deferredPrompt      = null;
 var editandoObra        = null;
 var editandoUsuario     = null;
+var chartHistoricoInstance = null;
+var globalHistoricoCache   = {}; // { 'yyyy-MM-dd': {version,fecha,horas,temps,vientos,lluvias} }
+var globalHistoricoMes     = null;
+var globalHistoricoDia     = null;
+var historicoInicializado  = false;
+var histSeriesHidden       = [false,false,false,false,false];
 // (fuenteActual eliminado en v15.0 — wttr.in es la única fuente)
 
 // ── PWA ───────────────────────────────────────────────────────
@@ -1420,6 +1485,14 @@ function actualizarVistaDatos(data) {
   var modoActivo = document.querySelector('.btn-sel-active');
   if (modoActivo && modoActivo.id) renderHeatmap(data.anual, modoActivo.id.replace('btn-',''));
   renderPerdidosBar(data.anual, data.obra || {});
+
+  // Historico: dia de hoy pudo haber cambiado con esta actualizacion, invalidar su cache
+  var hoyStr = pad2(new Date().getFullYear())+'-'+pad2(new Date().getMonth()+1)+'-'+pad2(new Date().getDate());
+  delete globalHistoricoCache[hoyStr];
+  historicoInicializado = false;
+  if (document.getElementById('panel-historico').classList.contains('active')) {
+    inicializarHistorico();
+  }
 }
 
 // ── TIMER ─────────────────────────────────────────────────────
@@ -1579,6 +1652,12 @@ function iniciarDashboard(data) {
   renderUptime60(globalUptime60);
   renderHeatmap(data.anual, 'perdido');
   renderPerdidosBar(data.anual, obra);
+
+  // Historico: los datos son por obra, invalidar cache y volver al tab Ahora
+  globalHistoricoCache  = {};
+  historicoInicializado = false;
+  if (chartHistoricoInstance) { chartHistoricoInstance.destroy(); chartHistoricoInstance = null; }
+  cambiarTabPrincipal('ahora');
 }
 
 // ── PANTALLAS ─────────────────────────────────────────────────
@@ -1845,14 +1924,205 @@ function renderPerdidosBar(anual, obra) {
   document.getElementById('pd-config').innerHTML  = 'De '+anual.length+' dias registrados<br><span style="font-size:0.68rem">Umbral: lluvia &gt;'+(obra.lluviaDP||'?')+'mm  viento &gt;'+(obra.vientoDP||'?')+' km/h ('+(obra.condicionDP||'?')+')</span>';
 }
 
+// ── TABS PRINCIPALES (Ahora / Historico) ───────────────────────
+function cambiarTabPrincipal(tab) {
+  document.getElementById('mtab-principal-ahora').classList.toggle('active', tab==='ahora');
+  document.getElementById('mtab-principal-historico').classList.toggle('active', tab==='historico');
+  document.getElementById('panel-ahora').classList.toggle('active', tab==='ahora');
+  document.getElementById('panel-historico').classList.toggle('active', tab==='historico');
+  ['clima','dias','anual','historico'].forEach(function(t) {
+    var el = document.getElementById('mtab-'+t);
+    if (el) el.classList.toggle('active', tab==='historico' ? t==='historico' : t==='clima');
+  });
+  if (tab === 'historico') inicializarHistorico();
+}
+
+// ── HISTORICO — selector de mes + tira de dias + grafico horario ──
+function inicializarHistorico() {
+  if (historicoInicializado) return;
+  historicoInicializado = true;
+  poblarMesesHistorico();
+}
+
+function poblarMesesHistorico() {
+  var wrap = document.getElementById('hist-meses');
+  wrap.innerHTML = '';
+  if (!globalAnual || !globalAnual.length) {
+    wrap.innerHTML = '';
+    document.getElementById('hist-dias-wrap').innerHTML = '';
+    document.getElementById('hist-dia-fecha').textContent = '-';
+    document.getElementById('hist-legend').innerHTML = '<div class="hist-vacio">Sin historial disponible todavia</div>';
+    return;
+  }
+  var meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  var vistos = {}, lista = [];
+  for (var i=0;i<globalAnual.length;i++) {
+    var ym = globalAnual[i].fecha.slice(0,7); // yyyy-MM
+    if (!vistos[ym]) { vistos[ym] = true; lista.push(ym); }
+  }
+  lista.sort();
+  lista.forEach(function(ym) {
+    var partes = ym.split('-'), anio = partes[0], mes = parseInt(partes[1], 10);
+    var btn = document.createElement('div');
+    btn.className = 'hist-mes-btn';
+    btn.id = 'hist-mes-' + ym;
+    btn.textContent = meses[mes-1] + ' ' + anio;
+    btn.onclick = (function(y) { return function() { seleccionarMesHistorico(y); }; })(ym);
+    wrap.appendChild(btn);
+  });
+  seleccionarMesHistorico(lista[lista.length - 1]); // ultimo mes con datos por defecto
+}
+
+function seleccionarMesHistorico(ym) {
+  globalHistoricoMes = ym;
+  document.querySelectorAll('.hist-mes-btn').forEach(function(b) {
+    b.classList.toggle('active', b.id === 'hist-mes-' + ym);
+  });
+  renderDiasHistorico(ym);
+}
+
+function renderDiasHistorico(ym) {
+  var wrap = document.getElementById('hist-dias-wrap');
+  wrap.innerHTML = '';
+  var porFecha = {};
+  for (var i=0;i<globalAnual.length;i++) porFecha[globalAnual[i].fecha] = globalAnual[i];
+
+  var partes = ym.split('-'), anio = parseInt(partes[0],10), mes = parseInt(partes[1],10);
+  var diasEnMes = new Date(anio, mes, 0).getDate();
+  var hoy = new Date();
+  var hoyStr = hoy.getFullYear() + '-' + pad2(hoy.getMonth()+1) + '-' + pad2(hoy.getDate());
+  var fechasConDatosEsteMes = [];
+
+  for (var d=1; d<=diasEnMes; d++) {
+    var fecha = ym + '-' + pad2(d);
+    if (fecha > hoyStr) break; // no mostrar dias futuros
+    var dato   = porFecha[fecha];
+    var estado = dato ? (dato.diaPerdido ? 'perdido' : 'normal') : 'sinDatos';
+    var tile = document.createElement('div');
+    tile.className = 'hist-dia hist-dia-' + estado;
+    tile.id        = 'hist-dia-' + fecha;
+    tile.textContent = d;
+    tile.title = formatFechaLarga(fecha) + (dato
+      ? ' - ' + (dato.diaPerdido ? 'Dia perdido' : 'Normal') + ' | ' + dato.tempProm + 'C  ' + dato.vientoMax + 'km/h  ' + dato.lluviaTotal + 'mm'
+      : ' - sin registros');
+    if (dato) {
+      tile.onclick = (function(f) { return function() { seleccionarDiaHistorico(f); }; })(fecha);
+      fechasConDatosEsteMes.push(fecha);
+    }
+    wrap.appendChild(tile);
+  }
+
+  if (fechasConDatosEsteMes.length) {
+    seleccionarDiaHistorico(fechasConDatosEsteMes[fechasConDatosEsteMes.length - 1]);
+  } else {
+    globalHistoricoDia = null;
+    document.getElementById('hist-dia-fecha').textContent = 'Sin registros este mes';
+    document.getElementById('hist-legend').innerHTML = '';
+    if (chartHistoricoInstance) { chartHistoricoInstance.destroy(); chartHistoricoInstance = null; }
+  }
+}
+
+function seleccionarDiaHistorico(fecha) {
+  globalHistoricoDia = fecha;
+  document.querySelectorAll('.hist-dia').forEach(function(t) {
+    t.classList.toggle('hist-dia-selected', t.id === 'hist-dia-' + fecha);
+  });
+  document.getElementById('hist-dia-fecha').textContent = formatFechaLarga(fecha);
+
+  if (globalHistoricoCache[fecha]) {
+    renderChartHistorico(globalHistoricoCache[fecha]);
+    return;
+  }
+
+  document.getElementById('hist-legend').innerHTML = '<span style="font-size:0.75rem;color:var(--muted);">Cargando...</span>';
+  fetch(API_URL + '?action=horasDia&email=' + encodeURIComponent(userEmail) + '&obraId=' + obraSeleccionada.id + '&fecha=' + fecha)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) {
+        document.getElementById('hist-legend').innerHTML = '<span style="font-size:0.75rem;color:#dc2626;">Error: ' + data.error + '</span>';
+        return;
+      }
+      globalHistoricoCache[fecha] = data;
+      if (globalHistoricoDia === fecha) renderChartHistorico(data); // descarta si el usuario ya cambio de dia
+    })
+    .catch(function() {
+      document.getElementById('hist-legend').innerHTML = '<span style="font-size:0.75rem;color:#dc2626;">Error de conexion</span>';
+    });
+}
+
+function renderChartHistorico(d) {
+  if (chartHistoricoInstance) { chartHistoricoInstance.destroy(); chartHistoricoInstance = null; }
+  if (!d || !d.horas || !d.horas.length) {
+    document.getElementById('hist-legend').innerHTML = '<div class="hist-vacio">Sin registros horarios para este dia</div>';
+    return;
+  }
+  var horas = d.horas, temps = d.temps, vientos = d.vientos, lluvias = d.lluvias;
+  var vientoDP = globalObra.vientoDP || 0;
+  var lluviaDP = globalObra.lluviaDP || 0;
+  var umbralViento = horas.map(function() { return vientoDP; });
+  var umbralLluvia = horas.map(function() { return lluviaDP; });
+
+  histSeriesHidden = [false,false,false,false,false];
+
+  chartHistoricoInstance = new Chart(document.getElementById('chartHistorico').getContext('2d'), {
+    data: { labels: horas, datasets: [
+      { type:'line', label:'Temperatura (C)', data:temps,   borderColor:'#d97706', backgroundColor:'transparent', borderWidth:2.5, pointRadius:3, pointBackgroundColor:'#d97706', tension:0.3, yAxisID:'yTemp' },
+      { type:'bar',  label:'Viento (km/h)',    data:vientos, backgroundColor:'#93c5fd', borderColor:'#2563eb', borderWidth:1, borderRadius:3, yAxisID:'yBar' },
+      { type:'bar',  label:'Lluvia (mm)',      data:lluvias, backgroundColor:'#fca5a5', borderColor:'#dc2626', borderWidth:1, borderRadius:3, yAxisID:'yBar' },
+      { type:'line', label:'Umbral viento',    data:umbralViento, borderColor:'#2563eb', borderWidth:1.5, borderDash:[6,4], pointRadius:0, yAxisID:'yBar' },
+      { type:'line', label:'Umbral lluvia',    data:umbralLluvia, borderColor:'#dc2626', borderWidth:1.5, borderDash:[6,4], pointRadius:0, yAxisID:'yBar' }
+    ]},
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{ legend:{ display:false }, tooltip:{ backgroundColor:'#fff', borderColor:'#e2e8f0', borderWidth:1, titleColor:'#1e293b', bodyColor:'#64748b', padding:10 } },
+      scales:{
+        x:     { grid:{color:'#f1f5f9'}, ticks:{color:'#64748b',font:{size:11}} },
+        yTemp: { position:'left',  grid:{color:'#f1f5f9'}, ticks:{color:'#d97706',font:{size:10}}, title:{display:true,text:'C',color:'#d97706',font:{size:10}} },
+        yBar:  { position:'right', grid:{drawOnChartArea:false}, ticks:{color:'#64748b',font:{size:10}}, title:{display:true,text:'km/h - mm',color:'#64748b',font:{size:10}} }
+      }
+    }
+  });
+
+  renderHistLegend([
+    { label:'Temperatura (C)',                            color:'#d97706', idx:0 },
+    { label:'Viento (km/h)',                               color:'#2563eb', idx:1 },
+    { label:'Lluvia (mm)',                                 color:'#dc2626', idx:2 },
+    { label:'Umbral viento ' + (vientoDP || '-') + ' km/h', color:'#2563eb', dash:true, idx:3 },
+    { label:'Umbral lluvia ' + (lluviaDP || '-') + ' mm',   color:'#dc2626', dash:true, idx:4 }
+  ]);
+}
+
+function renderHistLegend(defs) {
+  var wrap = document.getElementById('hist-legend');
+  wrap.innerHTML = '';
+  defs.forEach(function(def) {
+    var item = document.createElement('div');
+    item.className = 'hist-legend-item';
+    item.id        = 'hist-legend-' + def.idx;
+    var dotStyle = def.dash
+      ? 'background:transparent;border-bottom:2px dashed ' + def.color + ';'
+      : 'background:' + def.color + ';';
+    item.innerHTML = '<div class="hist-legend-dot' + (def.dash ? ' hist-legend-dash' : '') + '" style="' + dotStyle + '"></div>' + def.label;
+    item.onclick = (function(idx) { return function() { toggleHistDataset(idx); }; })(def.idx);
+    wrap.appendChild(item);
+  });
+}
+
+function toggleHistDataset(idx) {
+  if (!chartHistoricoInstance) return;
+  histSeriesHidden[idx] = !histSeriesHidden[idx];
+  chartHistoricoInstance.getDatasetMeta(idx).hidden = histSeriesHidden[idx];
+  chartHistoricoInstance.update();
+  var item = document.getElementById('hist-legend-' + idx);
+  if (item) item.classList.toggle('hist-legend-off', histSeriesHidden[idx]);
+}
+
 // ── MOBILE TABS ───────────────────────────────────────────────
-var seccionesMobile = {
-  clima:  ['.card', '#top-block'],
-  dias:   ['#dias-y-grafico', '.section:nth-child(1)'],
-  anual:  ['.section:nth-child(2)', '.section:nth-child(3)']
-};
 function cambiarTabMobile(tab) {
-  ['clima','dias','anual'].forEach(function(t) {
+  if (tab === 'historico') { cambiarTabPrincipal('historico'); return; }
+  cambiarTabPrincipal('ahora');
+  ['clima','dias','anual','historico'].forEach(function(t) {
     document.getElementById('mtab-'+t).classList.toggle('active', t===tab);
   });
   if (tab === 'clima') {
@@ -1861,7 +2131,7 @@ function cambiarTabMobile(tab) {
     var el = document.getElementById('dias-y-grafico');
     if (el) el.scrollIntoView({behavior: 'smooth', block: 'start'});
   } else if (tab === 'anual') {
-    var sections = document.querySelectorAll('#scroll-area .section');
+    var sections = document.querySelectorAll('#panel-ahora .section');
     if (sections[1]) sections[1].scrollIntoView({behavior: 'smooth', block: 'start'});
   }
 }
