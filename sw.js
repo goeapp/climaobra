@@ -1,9 +1,10 @@
 // ============================================================
 //  ClimaObra — Service Worker
-//  v16 — Multi-obra PWA
+//  v16.1.0 — bump de cache por cambio sustancial de index.html
+//            (reemplazo de auth Google por pwa_pin)
 // ============================================================
 
-const CACHE_NAME = 'climaobra-v16';
+const CACHE_NAME = 'climaobra-v16-1';
 
 // Archivos a cachear en la instalación
 const ASSETS = [
@@ -48,7 +49,6 @@ self.addEventListener('fetch', function(event) {
   // Llamadas al GAS y a APIs externas → siempre red, sin cache
   if (
     url.includes('script.google.com') ||
-    url.includes('accounts.google.com') ||
     url.includes('wttr.in') ||
     url.includes('tile.openstreetmap.org') ||
     url.includes('fonts.googleapis.com') ||
