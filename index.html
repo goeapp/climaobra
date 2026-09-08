@@ -18,7 +18,6 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root {
     --bg:      #f1f5f9;
@@ -60,7 +59,39 @@
   .login-logo  { font-family: 'Bebas Neue', sans-serif; font-size: 2.2rem; color: var(--accent); letter-spacing: 2px; margin-bottom: 8px; }
   .login-sub   { font-size: 0.82rem; color: var(--muted); margin-bottom: 32px; }
   .login-ver   { font-size: 0.72rem; color: var(--muted); margin-top: 16px; }
-  #g-btn-wrap  { display: flex; justify-content: center; }
+
+  /* ── LOGIN pwa_pin ───────────────────────────────────────── */
+  .pin-paso    { display: flex; flex-direction: column; gap: 10px; }
+  .pin-input   {
+    width: 100%; padding: 11px 14px; border: 1px solid var(--border);
+    border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 0.9rem;
+    text-align: center; color: var(--text);
+  }
+  .pin-input:focus { outline: none; border-color: var(--accent); }
+  .pin-input-codigo { letter-spacing: 6px; font-size: 1.1rem; font-weight: 600; }
+  .pin-sub     { font-size: 0.78rem; color: var(--muted); text-align: center; margin-bottom: 4px; }
+  .pin-error   { font-size: 0.75rem; color: #dc2626; text-align: center; min-height: 18px; }
+  .pin-link    {
+    background: none; border: none; color: var(--muted); font-size: 0.75rem;
+    text-decoration: underline; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    padding: 4px;
+  }
+  .pin-link:disabled { opacity: 0.5; cursor: not-allowed; text-decoration: none; }
+  .btn-ingresar:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ── DIALOG "Sesión actual" (Ctrl+Alt+U) — SÍ cierra por click afuera ── */
+  .overlay-sesion {
+    display: none; position: fixed; inset: 0; z-index: 999;
+    background: rgba(15,23,42,0.45); align-items: center; justify-content: center;
+  }
+  .sesion-box {
+    background: var(--surface); border-radius: var(--radius); padding: 24px;
+    width: 90%; max-width: 320px; box-shadow: var(--shadow);
+  }
+  .sesion-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 1px; color: var(--accent); margin-bottom: 14px; }
+  .sesion-row   { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.82rem; }
+  .sesion-row:last-of-type { border-bottom: none; }
+  .sesion-label { color: var(--muted); }
 
   /* ── SELECTOR DE OBRA ────────────────────────────────────── */
   #selector-screen {
@@ -736,13 +767,58 @@
 </head>
 <body>
 
-<!-- LOGIN -->
+<!-- LOGIN — pwa_pin (email + PIN) -->
 <div id="login-screen">
   <div class="login-box">
     <div class="login-logo">&#127959; ClimaObra</div>
     <div class="login-sub">Sistema de registro climatico para obra</div>
-    <div id="g-btn-wrap"></div>
-    <div class="login-ver">v16.0.1</div>
+
+    <!-- Paso 1: pedir email -->
+    <div id="pin-paso-email" class="pin-paso">
+      <input type="email" id="pin-input-email" class="pin-input" placeholder="tu-email@empresa.com" autocomplete="email">
+      <button id="pin-btn-email" class="btn-ingresar" onclick="pinPedirCodigo()">Enviar código</button>
+      <div id="pin-error-email" class="pin-error"></div>
+    </div>
+
+    <!-- Paso 2: esperando código -->
+    <div id="pin-paso-codigo" class="pin-paso" style="display:none;">
+      <div class="pin-sub">Código enviado a <b id="pin-email-mostrado">-</b></div>
+      <input type="text" id="pin-input-codigo" class="pin-input pin-input-codigo" placeholder="000000" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+      <button id="pin-btn-codigo" class="btn-ingresar" onclick="pinValidarCodigo()">Ingresar</button>
+      <button id="pin-btn-reenviar" class="pin-link" onclick="pinPedirCodigo(true)">Reenviar código</button>
+      <div id="pin-error-codigo" class="pin-error"></div>
+    </div>
+
+    <!-- Paso 3: validando sesión guardada -->
+    <div id="pin-paso-validando" class="pin-paso" style="display:none;">
+      <div class="spinner" style="margin:8px auto;"></div>
+      <div class="pin-sub">Validando usuario...</div>
+    </div>
+
+    <!-- Paso 4: sin conexión -->
+    <div id="pin-paso-sinconexion" class="pin-paso" style="display:none;">
+      <div class="pin-sub">Sin conexión. No se puede validar el acceso.</div>
+      <button class="btn-ingresar" onclick="pinReintentar()">Reintentar</button>
+    </div>
+
+    <!-- Paso 5: error de auth (bloqueado / inactivo / etc.) -->
+    <div id="pin-paso-errorauth" class="pin-paso" style="display:none;">
+      <div class="pin-sub" id="pin-errorauth-msg">-</div>
+      <button class="btn-ingresar" onclick="pinReintentar()">Volver a intentar</button>
+    </div>
+
+    <div class="login-ver">v16.1.0</div>
+  </div>
+</div>
+
+<!-- Dialog "Sesión actual" — atajo Ctrl+Alt+U, cierra por click afuera -->
+<div id="overlay-sesion" class="overlay-sesion" onclick="if(event.target===this) cerrarDialogSesion()">
+  <div class="sesion-box">
+    <div class="sesion-title">Sesión actual</div>
+    <div class="sesion-row"><span class="sesion-label">Email</span><span id="sesion-email">-</span></div>
+    <div class="sesion-row"><span class="sesion-label">Nombre</span><span id="sesion-nombre">-</span></div>
+    <div class="sesion-row"><span class="sesion-label">Vence</span><span id="sesion-vence">-</span></div>
+    <button class="btn-logout" style="width:100%;margin-top:16px;" onclick="cerrarSesion()">Cerrar sesion</button>
   </div>
 </div>
 
@@ -1226,9 +1302,8 @@
 
 <script>
 // ── CONFIGURACION ─────────────────────────────────────────────
-var CLIENT_ID   = '174536806740-aus6npjphhdcn5nkgtt1ejl0tcj16ou7.apps.googleusercontent.com';
 var API_URL     = 'https://script.google.com/macros/s/AKfycbzH5slzkOQ8fvhCt9JXIoMFNxrBZghZv34fowPI2Yk948eTxhZmHFX37InwpnxmkVBU/exec';
-var VERSION_UI  = 'v16.0.1';
+var VERSION_UI  = 'v16.1.0';
 // ─────────────────────────────────────────────────────────────
 
 var chart7Instance      = null;
@@ -1278,61 +1353,188 @@ function instalarPWA() {
   });
 }
 
-// ── GOOGLE IDENTITY ───────────────────────────────────────────
-function inicializarGoogle() {
-  google.accounts.id.initialize({ client_id: CLIENT_ID, callback: onLoginGoogle, auto_select: false });
-  google.accounts.id.renderButton(document.getElementById('g-btn-wrap'), { theme: 'outline', size: 'large', text: 'signin_with', locale: 'es' });
-}
+// ── AUTH pwa_pin (email + PIN) ──────────────────────────────────
+var PIN_EMAIL_ACTUAL = ''; // email en curso durante el login, antes de confirmar sesión
 
 window.onload = function() {
-  var guardado = localStorage.getItem('co_email');
-  if (guardado) {
-    // Sesión previa encontrada → entrar directo sin depender de Google
-    userEmail = guardado;
-    mostrarCargando('Verificando acceso...');
-    iniciarFlujo(guardado);
-    // Inicializar Google en background por si el usuario hace logout
-    if (typeof google !== 'undefined') {
-      inicializarGoogle();
-    } else {
-      var iv = setInterval(function() {
-        if (typeof google !== 'undefined') { clearInterval(iv); inicializarGoogle(); }
-      }, 200);
-    }
-  } else {
-    // Sin sesión previa → mostrar botón de login
-    if (typeof google !== 'undefined') {
-      inicializarGoogle();
-    } else {
-      var iv = setInterval(function() {
-        if (typeof google !== 'undefined') { clearInterval(iv); inicializarGoogle(); }
-      }, 200);
-    }
+  var sesion = pinLeerSesion();
+
+  if (!sesion) { mostrarLogin(); pinMostrarPaso('email'); return; }
+
+  var localVencida = Date.now() > sesion.exp;
+
+  if (localVencida && !sesion.noExpira) {
+    // Vencida y sin "modo presentación" → directo a pedir PIN, sin gastar
+    // una llamada de más al backend.
+    pinBorrarSesion();
+    mostrarLogin();
+    pinMostrarPaso('email');
+    return;
   }
+
+  // Sesión vigente (o NoExpira) → revalidar contra backend antes de mostrar la app
+  mostrarLogin();
+  pinMostrarPaso('validando');
+
+  fetch(API_URL + '?action=validarSesion&email=' + encodeURIComponent(sesion.email))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.ok) {
+        // inactivo / bloqueado / no_encontrado → cortar sesión
+        pinBorrarSesion();
+        document.getElementById('pin-errorauth-msg').textContent = pinMensajeError(data.motivo);
+        mostrarLogin();
+        pinMostrarPaso('errorauth');
+        return;
+      }
+      if (localVencida && !data.noExpira) {
+        // Estaba vencida localmente y el backend ya no confirma NoExpira → recién ahora se corta
+        pinBorrarSesion();
+        mostrarLogin();
+        pinMostrarPaso('email');
+        return;
+      }
+      // Sigue viva — se actualiza el cache sin tocar el "exp" original
+      pinGuardarSesion({ email: sesion.email, nombreApellido: data.nombreApellido || '', noExpira: !!data.noExpira, exp: sesion.exp });
+      userEmail  = sesion.email;
+      userNombre = data.nombreApellido || '';
+      mostrarCargando('Verificando acceso...');
+      iniciarFlujo(userEmail);
+    })
+    .catch(function() {
+      // Sin red → NO borrar la sesión, mostrar "sin conexión, reintentar"
+      mostrarLogin();
+      pinMostrarPaso('sinconexion');
+    });
 };
 
-function onLoginGoogle(response) {
-  var payload = parseJwt(response.credential);
-  userEmail   = payload.email;
-  localStorage.setItem('co_email', userEmail);
-  mostrarCargando('Verificando acceso...');
-  iniciarFlujo(userEmail);
+function pinMostrarPaso(paso) {
+  ['email','codigo','validando','sinconexion','errorauth'].forEach(function(p) {
+    document.getElementById('pin-paso-' + p).style.display = (p === paso) ? 'flex' : 'none';
+  });
 }
 
-function parseJwt(token) {
-  var base64 = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
-  return JSON.parse(decodeURIComponent(atob(base64).split('').map(function(c) {
-    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-  }).join('')));
+function pinPedirCodigo(reenvio) {
+  var email = reenvio ? PIN_EMAIL_ACTUAL : document.getElementById('pin-input-email').value.trim().toLowerCase();
+  if (!email) { document.getElementById('pin-error-email').textContent = 'Ingresá tu email.'; return; }
+  PIN_EMAIL_ACTUAL = email;
+
+  var btn    = reenvio ? document.getElementById('pin-btn-reenviar') : document.getElementById('pin-btn-email');
+  var errBox = reenvio ? document.getElementById('pin-error-codigo') : document.getElementById('pin-error-email');
+  btn.disabled = true;
+  errBox.textContent = '';
+
+  fetch(API_URL + '?action=solicitarPin&email=' + encodeURIComponent(email))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.disabled = false;
+      if (data.ok) {
+        document.getElementById('pin-email-mostrado').textContent = email;
+        document.getElementById('pin-input-codigo').value = '';
+        pinMostrarPaso('codigo');
+        document.getElementById('pin-error-codigo').textContent = reenvio ? 'Código reenviado.' : '';
+      } else {
+        errBox.textContent = pinMensajeError(data.motivo, data.restanteSegundos);
+      }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      errBox.textContent = 'Error de conexión. Reintentá.';
+    });
+}
+
+function pinValidarCodigo() {
+  var pin    = document.getElementById('pin-input-codigo').value.trim();
+  var errBox = document.getElementById('pin-error-codigo');
+  if (!pin) { errBox.textContent = 'Ingresá el código.'; return; }
+
+  var btn = document.getElementById('pin-btn-codigo');
+  btn.disabled = true;
+  errBox.textContent = '';
+
+  fetch(API_URL + '?action=validarPin&email=' + encodeURIComponent(PIN_EMAIL_ACTUAL) + '&pin=' + encodeURIComponent(pin))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.disabled = false;
+      if (data.ok) {
+        var exp = Date.now() + 7 * 24 * 60 * 60 * 1000; // sesión: 7 días locales
+        pinGuardarSesion({ email: PIN_EMAIL_ACTUAL, nombreApellido: data.nombreApellido || '', noExpira: !!data.noExpira, exp: exp });
+        userEmail  = PIN_EMAIL_ACTUAL;
+        userNombre = data.nombreApellido || '';
+        mostrarCargando('Verificando acceso...');
+        iniciarFlujo(userEmail);
+      } else {
+        errBox.textContent = pinMensajeError(data.motivo, null, data.restantes);
+      }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      errBox.textContent = 'Error de conexión. Reintentá.';
+    });
+}
+
+function pinMensajeError(motivo, restanteSegundos, restantes) {
+  switch (motivo) {
+    case 'no_encontrado':    return 'Email no registrado. Contactá al administrador.';
+    case 'inactivo':         return 'Usuario inactivo. Contactá al administrador.';
+    case 'bloqueado':        return 'Usuario bloqueado por intentos fallidos. Contactá al administrador.';
+    case 'cooldown':         return 'Esperá ' + restanteSegundos + 's antes de reenviar.';
+    case 'pin_vencido':      return 'El código venció. Pedí uno nuevo.';
+    case 'sin_pin_generado': return 'Pedí un código primero.';
+    case 'pin_incorrecto':   return 'Código incorrecto. Te quedan ' + restantes + ' intento(s).';
+    case 'bloqueado_ahora':  return 'Demasiados intentos — usuario bloqueado. Contactá al administrador.';
+    case 'error_envio_mail': return 'No se pudo enviar el mail. Reintentá en unos minutos.';
+    default:                 return 'Error inesperado. Reintentá.';
+  }
+}
+
+function pinReintentar() {
+  pinBorrarSesion();
+  document.getElementById('pin-input-email').value = '';
+  document.getElementById('pin-error-email').textContent = '';
+  pinMostrarPaso('email');
+}
+
+// ── Sesión pwa_pin en localStorage (prefijo climaobra_) ─────────
+function pinLeerSesion() {
+  var raw = localStorage.getItem('climaobra_sesion');
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (e) { return null; }
+}
+function pinGuardarSesion(obj) {
+  localStorage.setItem('climaobra_sesion', JSON.stringify(obj));
+}
+function pinBorrarSesion() {
+  localStorage.removeItem('climaobra_sesion');
 }
 
 function cerrarSesion() {
-  localStorage.removeItem('co_email');
+  pinBorrarSesion();
   localStorage.removeItem('co_obra');
-  google.accounts.id.disableAutoSelect();
   obraSeleccionada = null; userRol = ''; obrasPermitidas = [];
+  cerrarDialogSesion();
   mostrarLogin();
+  pinMostrarPaso('email');
 }
+
+// ── Dialog "Sesión actual" (Ctrl+Alt+U) — cierra por click afuera ──
+function abrirDialogSesion() {
+  var sesion = pinLeerSesion();
+  if (!sesion) return;
+  document.getElementById('sesion-email').textContent  = sesion.email;
+  document.getElementById('sesion-nombre').textContent = sesion.nombreApellido || '(sin nombre cargado)';
+  document.getElementById('sesion-vence').textContent  = sesion.noExpira ? 'No vence (modo presentación)' : new Date(sesion.exp).toLocaleString('es-AR');
+  document.getElementById('overlay-sesion').style.display = 'flex';
+}
+function cerrarDialogSesion() {
+  document.getElementById('overlay-sesion').style.display = 'none';
+}
+document.addEventListener('keydown', function(e) {
+  if (e.ctrlKey && e.altKey && (e.key === 'u' || e.key === 'U')) {
+    e.preventDefault();
+    abrirDialogSesion();
+  }
+});
 
 // ── FLUJO DE INICIO ───────────────────────────────────────────
 // 1. Pedir obras permitidas al GAS
@@ -3091,7 +3293,7 @@ function abrirInformePDF() {
   document.getElementById('pdf-msg').textContent = 'Cargando períodos disponibles...';
 
   var obraId = (window._obraActual && window._obraActual.id) || '0000';
-  var email  = localStorage.getItem('co_email') || '';
+  var email  = userEmail || (pinLeerSesion() && pinLeerSesion().email) || '';
 
   // Pedimos cualquier mes para obtener la lista de mesesDisponibles
   fetch(API_URL + '?action=' + _actionReport() + '&email=' + encodeURIComponent(email) +
@@ -3158,7 +3360,7 @@ function generarInformePDF() {
   document.getElementById('pdf-msg').textContent = 'Consultando datos al servidor...';
 
   var obraId = (window._obraActual && window._obraActual.id) || '0000';
-  var email  = localStorage.getItem('co_email') || '';
+  var email  = userEmail || (pinLeerSesion() && pinLeerSesion().email) || '';
 
   fetch(API_URL + '?action=' + _actionReport() + '&email=' + encodeURIComponent(email) +
         '&obraId=' + encodeURIComponent(obraId) +
