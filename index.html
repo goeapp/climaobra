@@ -384,7 +384,9 @@
   .hres-card         { width: 100px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 9px; min-height: 158px; box-shadow: var(--shadow); }
   .hres-card-hoy     { width: 124px; background: #fff7ed; border: 1.5px solid var(--accent); padding: 10px 11px; }
   .hres-head         { font-size: 0.62rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; text-align: center; margin-bottom: 7px; font-weight: 600; }
+  .hres-head-fecha   { display: block; font-size: 0.58rem; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--muted); margin-top: 1px; }
   .hres-card-hoy .hres-head { color: var(--accent); font-weight: 700; font-size: 0.68rem; }
+  .hres-card-hoy .hres-head-fecha { color: var(--accent); opacity: 0.75; }
   .hres-row          { margin-bottom: 6px; }
   .hres-row:last-child { margin-bottom: 0; }
   .hres-lbl          { font-size: 0.58rem; color: var(--muted); margin-bottom: 1px; }
@@ -832,7 +834,7 @@
       <button class="btn-ingresar" onclick="pinReintentar()">Volver a intentar</button>
     </div>
 
-    <div class="login-ver">v16.3.0</div>
+    <div class="login-ver">v16.4.0</div>
   </div>
 </div>
 
@@ -1333,7 +1335,7 @@
 <script>
 // ── CONFIGURACION ─────────────────────────────────────────────
 var API_URL     = 'https://script.google.com/macros/s/AKfycbzH5slzkOQ8fvhCt9JXIoMFNxrBZghZv34fowPI2Yk948eTxhZmHFX37InwpnxmkVBU/exec';
-var VERSION_UI  = 'v16.3.0';
+var VERSION_UI  = 'v16.4.0';
 // ─────────────────────────────────────────────────────────────
 
 var chart7Instance      = null;
@@ -1730,6 +1732,7 @@ function actualizarVistaDatos(data) {
   // Historico: dia de hoy pudo haber cambiado con esta actualizacion, invalidar su cache
   var hoyStr = pad2(new Date().getFullYear())+'-'+pad2(new Date().getMonth()+1)+'-'+pad2(new Date().getDate());
   delete globalHistoricoCache[hoyStr];
+  delete globalResumenCache[hoyStr];
   historicoInicializado = false;
   if (document.getElementById('panel-historico').classList.contains('active')) {
     inicializarHistorico();
@@ -1896,6 +1899,7 @@ function iniciarDashboard(data) {
 
   // Historico: los datos son por obra, invalidar cache y volver al tab Ahora
   globalHistoricoCache  = {};
+  globalResumenCache    = {};
   historicoInicializado = false;
   if (chartHistoricoInstance) { chartHistoricoInstance.destroy(); chartHistoricoInstance = null; }
   cambiarTabPrincipal('ahora');
@@ -2339,11 +2343,13 @@ function renderChartHistorico(d) {
   cargarResumenTresDias(d.fecha);
 }
 
-// ── HISTORICO — resumen Ayer/Hoy/Manana (v16.3.0) ─────────────
-// Lee action=resumenDias (ResumenDiario en el backend) en una sola
-// llamada para los 3 dias — reemplaza el calculo en frontend + las
-// 2 llamadas a horasDia de v16.2.0, que escaneaban Registros entero.
-var resumenReqId = 0;
+// ── HISTORICO — resumen Ayer/Hoy/Manana (v16.4.0) ─────────────
+// Cache cliente por fecha (mismo patron que globalHistoricoCache del
+// grafico) + medicion en consola del tiempo real de ida y vuelta al GAS,
+// para poder distinguir "el calculo es lento" de "el round-trip a Apps
+// Script es lento" (que es un costo fijo de infraestructura, no de datos).
+var resumenReqId    = 0;
+var globalResumenCache = {}; // { 'yyyy-MM-dd' (fecha de "hoy"): [resAyer, resHoy, resManana] }
 
 function sumarDiasISO(iso, delta) {
   var p  = iso.split('-');
@@ -2358,16 +2364,29 @@ function cargarResumenTresDias(fecha) {
   var fechaManana = sumarDiasISO(fecha, 1);
   var fechas      = [fechaAyer, fecha, fechaManana];
 
+  if (globalResumenCache[fecha]) {
+    console.log('[ClimaObra] resumenDias ' + fecha + ' — cache local, 0ms');
+    var cacheado = globalResumenCache[fecha];
+    renderResumenTresDias(fechaAyer, cacheado[0], fecha, cacheado[1], fechaManana, cacheado[2]);
+    return;
+  }
+
+  var t0 = performance.now();
   fetch(API_URL + '?action=resumenDias&email=' + encodeURIComponent(userEmail) + '&obraId=' + obraSeleccionada.id + '&fechas=' + fechas.join(','))
     .then(function(r) { return r.json(); })
     .then(function(data) {
+      var ms = Math.round(performance.now() - t0);
+      console.log('[ClimaObra] resumenDias ' + fecha + ' — ' + ms + 'ms (round-trip al GAS)');
       if (reqId !== resumenReqId) return; // el usuario ya cambio de dia mientras tanto
       var res = (data && data.resumenes) || [null, null, null];
-      renderResumenTresDias('ayer', res[0], 'hoy', res[1], 'mañana', res[2]);
+      globalResumenCache[fecha] = res;
+      renderResumenTresDias(fechaAyer, res[0], fecha, res[1], fechaManana, res[2]);
     })
     .catch(function() {
+      var ms = Math.round(performance.now() - t0);
+      console.log('[ClimaObra] resumenDias ' + fecha + ' — ERROR a los ' + ms + 'ms');
       if (reqId !== resumenReqId) return;
-      renderResumenTresDias('ayer', null, 'hoy', null, 'mañana', null);
+      renderResumenTresDias(fechaAyer, null, fecha, null, fechaManana, null);
     });
 }
 
@@ -2377,22 +2396,22 @@ function limpiarResumenTresDias() {
   if (wrap) wrap.innerHTML = '';
 }
 
-function renderResumenTresDias(lblAyer, rAyer, lblHoy, rHoy, lblManana, rManana) {
+function renderResumenTresDias(fechaAyer, rAyer, fechaHoy, rHoy, fechaManana, rManana) {
   var wrap = document.getElementById('hist-resumen');
   if (!wrap) return;
   wrap.innerHTML =
-    renderHresCard(lblAyer,   rAyer,  false) +
-    renderHresCard(lblHoy,    rHoy,   true)  +
-    renderHresCard(lblManana, rManana, false);
+    renderHresCard('ayer',   fechaAyer,   rAyer,  false) +
+    renderHresCard('hoy',    fechaHoy,    rHoy,   true)  +
+    renderHresCard('mañana', fechaManana, rManana, false);
 }
 
-function renderHresCard(label, r, esHoy) {
-  var cls = 'hres-card' + (esHoy ? ' hres-card-hoy' : '');
+function renderHresCard(label, fechaIso, r, esHoy) {
+  var cls    = 'hres-card' + (esHoy ? ' hres-card-hoy' : '');
+  var header = '<div class="hres-head">' + label + '<span class="hres-head-fecha">' + formatFechaCorta(fechaIso) + '</span></div>';
   if (!r) {
-    return '<div class="' + cls + '"><div class="hres-head">' + label + '</div><div class="hres-vacio">sin datos</div></div>';
+    return '<div class="' + cls + '">' + header + '<div class="hres-vacio">sin datos</div></div>';
   }
-  return '<div class="' + cls + '">' +
-    '<div class="hres-head">' + label + '</div>' +
+  return '<div class="' + cls + '">' + header +
     '<div class="hres-row"><div class="hres-lbl hres-lbl-temp">Temp</div><div class="hres-val">' + r.tempMax + '/' + r.tempMin + '&deg;<small> &middot; ' + r.tempProm + '</small></div></div>' +
     '<div class="hres-row"><div class="hres-lbl hres-lbl-wind">Viento</div><div class="hres-val">' + r.vientoMax + '/' + r.vientoMin + '<small> &middot; ' + r.vientoProm + '</small></div></div>' +
     '<div class="hres-row"><div class="hres-lbl hres-lbl-rain">Lluvia</div><div class="hres-val">' + r.lluviaAcum + ' mm</div></div>' +

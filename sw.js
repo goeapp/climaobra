@@ -1,10 +1,11 @@
 // ============================================================
 //  ClimaObra — Service Worker
-//  v16.3.0 — bump de cache por cambio de index.html
-//            (resumen Ayer/Hoy/Manana ahora via ResumenDiario)
+//  v16.4.0 — bump de cache por cambio de index.html
+//            (cache cliente de resumenDias + fecha en tarjetas +
+//             medicion de tiempos en consola)
 // ============================================================
 
-const CACHE_NAME = 'climaobra-v16-3';
+const CACHE_NAME = 'climaobra-v16-4';
 
 // Archivos a cachear en la instalación
 const ASSETS = [
