@@ -383,10 +383,8 @@
   .hist-resumen      { display: flex; gap: 8px; flex-shrink: 0; }
   .hres-card         { width: 100px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 9px; min-height: 158px; box-shadow: var(--shadow); }
   .hres-card-hoy     { width: 124px; background: #fff7ed; border: 1.5px solid var(--accent); padding: 10px 11px; }
-  .hres-head         { font-size: 0.62rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; text-align: center; margin-bottom: 7px; font-weight: 600; }
-  .hres-head-fecha   { display: block; font-size: 0.58rem; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--muted); margin-top: 1px; }
-  .hres-card-hoy .hres-head { color: var(--accent); font-weight: 700; font-size: 0.68rem; }
-  .hres-card-hoy .hres-head-fecha { color: var(--accent); opacity: 0.75; }
+  .hres-head         { font-size: 0.78rem; color: var(--text); text-align: center; margin-bottom: 8px; font-weight: 600; }
+  .hres-card-hoy .hres-head { color: var(--accent); font-weight: 700; font-size: 0.85rem; }
   .hres-row          { margin-bottom: 6px; }
   .hres-row:last-child { margin-bottom: 0; }
   .hres-lbl          { font-size: 0.58rem; color: var(--muted); margin-bottom: 1px; }
@@ -855,7 +853,7 @@
       <button class="btn-ingresar" onclick="pinReintentar()">Volver a intentar</button>
     </div>
 
-    <div class="login-ver">v16.5.0</div>
+    <div class="login-ver">v16.6.0</div>
   </div>
 </div>
 
@@ -1359,7 +1357,7 @@
 <script>
 // ── CONFIGURACION ─────────────────────────────────────────────
 var API_URL     = 'https://script.google.com/macros/s/AKfycbzH5slzkOQ8fvhCt9JXIoMFNxrBZghZv34fowPI2Yk948eTxhZmHFX37InwpnxmkVBU/exec';
-var VERSION_UI  = 'v16.5.0';
+var VERSION_UI  = 'v16.6.0';
 // ─────────────────────────────────────────────────────────────
 
 var chart7Instance      = null;
@@ -2404,9 +2402,9 @@ function mostrarSkeletonHistorico(fechaAyer, fechaHoy, fechaManana) {
   var wrap = document.getElementById('hist-resumen');
   if (wrap) {
     wrap.innerHTML =
-      renderHresCardSkeleton('ayer',   fechaAyer,   false) +
-      renderHresCardSkeleton('hoy',    fechaHoy,    true)  +
-      renderHresCardSkeleton('mañana', fechaManana, false);
+      renderHresCardSkeleton(fechaAyer,   false) +
+      renderHresCardSkeleton(fechaHoy,    true)  +
+      renderHresCardSkeleton(fechaManana, false);
   }
 }
 
@@ -2425,14 +2423,14 @@ function renderResumenTresDias(fechaAyer, rAyer, fechaHoy, rHoy, fechaManana, rM
   var wrap = document.getElementById('hist-resumen');
   if (!wrap) return;
   wrap.innerHTML =
-    renderHresCard('ayer',   fechaAyer,   rAyer,  false) +
-    renderHresCard('hoy',    fechaHoy,    rHoy,   true)  +
-    renderHresCard('mañana', fechaManana, rManana, false);
+    renderHresCard(fechaAyer,   rAyer,  false) +
+    renderHresCard(fechaHoy,    rHoy,   true)  +
+    renderHresCard(fechaManana, rManana, false);
 }
 
-function renderHresCard(label, fechaIso, r, esHoy) {
-  var cls    = 'hres-card' + (esHoy ? ' hres-card-hoy' : '');
-  var header = '<div class="hres-head">' + label + '<span class="hres-head-fecha">' + formatFechaCorta(fechaIso) + '</span></div>';
+function renderHresCard(fechaIso, r, esCentro) {
+  var cls    = 'hres-card' + (esCentro ? ' hres-card-hoy' : '');
+  var header = '<div class="hres-head">' + formatFechaCorta(fechaIso) + '</div>';
   if (!r) {
     return '<div class="' + cls + '">' + header + '<div class="hres-vacio">sin datos</div></div>';
   }
@@ -2443,9 +2441,9 @@ function renderHresCard(label, fechaIso, r, esHoy) {
   '</div>';
 }
 
-function renderHresCardSkeleton(label, fechaIso, esHoy) {
-  var cls    = 'hres-card' + (esHoy ? ' hres-card-hoy' : '');
-  var header = '<div class="hres-head">' + label + '<span class="hres-head-fecha">' + formatFechaCorta(fechaIso) + '</span></div>';
+function renderHresCardSkeleton(fechaIso, esCentro) {
+  var cls    = 'hres-card' + (esCentro ? ' hres-card-hoy' : '');
+  var header = '<div class="hres-head">' + formatFechaCorta(fechaIso) + '</div>';
   var fila   = '<div class="hres-row"><div class="hres-skel hres-skel-lbl"></div><div class="hres-skel hres-skel-val"></div></div>';
   return '<div class="' + cls + '">' + header + fila + fila + fila + '</div>';
 }
