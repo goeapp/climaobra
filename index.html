@@ -832,7 +832,7 @@
       <button class="btn-ingresar" onclick="pinReintentar()">Volver a intentar</button>
     </div>
 
-    <div class="login-ver">v16.2.0</div>
+    <div class="login-ver">v16.3.0</div>
   </div>
 </div>
 
@@ -1333,7 +1333,7 @@
 <script>
 // ── CONFIGURACION ─────────────────────────────────────────────
 var API_URL     = 'https://script.google.com/macros/s/AKfycbzH5slzkOQ8fvhCt9JXIoMFNxrBZghZv34fowPI2Yk948eTxhZmHFX37InwpnxmkVBU/exec';
-var VERSION_UI  = 'v16.2.0';
+var VERSION_UI  = 'v16.3.0';
 // ─────────────────────────────────────────────────────────────
 
 var chart7Instance      = null;
@@ -2336,10 +2336,13 @@ function renderChartHistorico(d) {
     { label:'Umbral lluvia ' + (lluviaDP || '-') + ' mm',   color:'#dc2626', dash:true, idx:4 }
   ]);
 
-  cargarResumenTresDias(d.fecha, d);
+  cargarResumenTresDias(d.fecha);
 }
 
-// ── HISTORICO — resumen Ayer/Hoy/Manana (v16.2.0) ─────────────
+// ── HISTORICO — resumen Ayer/Hoy/Manana (v16.3.0) ─────────────
+// Lee action=resumenDias (ResumenDiario en el backend) en una sola
+// llamada para los 3 dias — reemplaza el calculo en frontend + las
+// 2 llamadas a horasDia de v16.2.0, que escaneaban Registros entero.
 var resumenReqId = 0;
 
 function sumarDiasISO(iso, delta) {
@@ -2349,59 +2352,38 @@ function sumarDiasISO(iso, delta) {
   return dt.getFullYear() + '-' + pad2(dt.getMonth()+1) + '-' + pad2(dt.getDate());
 }
 
-function calcResumenDia(d) {
-  if (!d || !d.horas || !d.horas.length) return null;
-  var temps = d.temps, vientos = d.vientos, lluvias = d.lluvias;
-  var sum = function(arr) { return arr.reduce(function(a,b){ return a+b; }, 0); };
-  return {
-    tempMax:    Math.round(Math.max.apply(null, temps) * 10) / 10,
-    tempMin:    Math.round(Math.min.apply(null, temps) * 10) / 10,
-    tempProm:   Math.round((sum(temps) / temps.length) * 10) / 10,
-    vientoMax:  Math.round(Math.max.apply(null, vientos)),
-    vientoMin:  Math.round(Math.min.apply(null, vientos)),
-    vientoProm: Math.round(sum(vientos) / vientos.length),
-    lluviaAcum: Math.round(sum(lluvias) * 10) / 10
-  };
-}
-
-// Trae un dia para el resumen reutilizando la cache/accion horasDia ya existente.
-// Nunca rechaza la promesa (error de red o sin datos = null -> tarjeta "sin datos").
-function obtenerDiaHistorico(fecha) {
-  if (globalHistoricoCache[fecha]) return Promise.resolve(globalHistoricoCache[fecha]);
-  return fetch(API_URL + '?action=horasDia&email=' + encodeURIComponent(userEmail) + '&obraId=' + obraSeleccionada.id + '&fecha=' + fecha)
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.error || !data.horas || !data.horas.length) return null;
-      globalHistoricoCache[fecha] = data;
-      return data;
-    })
-    .catch(function() { return null; });
-}
-
-function cargarResumenTresDias(fecha, dHoy) {
+function cargarResumenTresDias(fecha) {
   var reqId       = ++resumenReqId;
   var fechaAyer   = sumarDiasISO(fecha, -1);
   var fechaManana = sumarDiasISO(fecha, 1);
-  Promise.all([ obtenerDiaHistorico(fechaAyer), obtenerDiaHistorico(fechaManana) ])
-    .then(function(res) {
+  var fechas      = [fechaAyer, fecha, fechaManana];
+
+  fetch(API_URL + '?action=resumenDias&email=' + encodeURIComponent(userEmail) + '&obraId=' + obraSeleccionada.id + '&fechas=' + fechas.join(','))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
       if (reqId !== resumenReqId) return; // el usuario ya cambio de dia mientras tanto
-      renderResumenTresDias('ayer', res[0], 'hoy', dHoy, 'mañana', res[1]);
+      var res = (data && data.resumenes) || [null, null, null];
+      renderResumenTresDias('ayer', res[0], 'hoy', res[1], 'mañana', res[2]);
+    })
+    .catch(function() {
+      if (reqId !== resumenReqId) return;
+      renderResumenTresDias('ayer', null, 'hoy', null, 'mañana', null);
     });
 }
 
 function limpiarResumenTresDias() {
-  resumenReqId++; // invalida cualquier fetch de vecinos en vuelo
+  resumenReqId++; // invalida cualquier fetch en vuelo
   var wrap = document.getElementById('hist-resumen');
   if (wrap) wrap.innerHTML = '';
 }
 
-function renderResumenTresDias(lblAyer, dAyer, lblHoy, dHoy, lblManana, dManana) {
+function renderResumenTresDias(lblAyer, rAyer, lblHoy, rHoy, lblManana, rManana) {
   var wrap = document.getElementById('hist-resumen');
   if (!wrap) return;
   wrap.innerHTML =
-    renderHresCard(lblAyer,   calcResumenDia(dAyer),  false) +
-    renderHresCard(lblHoy,    calcResumenDia(dHoy),   true)  +
-    renderHresCard(lblManana, calcResumenDia(dManana), false);
+    renderHresCard(lblAyer,   rAyer,  false) +
+    renderHresCard(lblHoy,    rHoy,   true)  +
+    renderHresCard(lblManana, rManana, false);
 }
 
 function renderHresCard(label, r, esHoy) {
