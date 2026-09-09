@@ -376,6 +376,26 @@
   .hist-legend-dot.hist-legend-dash { border-radius: 0; height: 2px; width: 14px; }
   .hist-vacio       { color: var(--muted); font-size: 0.8rem; padding: 30px 10px; text-align: center; }
 
+  /* ── HISTORICO — resumen Ayer/Hoy/Manana (v16.2.0) ─────────── */
+  .hist-chart-flex   { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+  .hist-chart-main   { flex: 1 1 260px; min-width: 260px; }
+  .chart-wrap-hist   { min-width: 260px; height: 220px; }
+  .hist-resumen      { display: flex; gap: 8px; flex-shrink: 0; }
+  .hres-card         { width: 100px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 9px; min-height: 158px; box-shadow: var(--shadow); }
+  .hres-card-hoy     { width: 124px; background: #fff7ed; border: 1.5px solid var(--accent); padding: 10px 11px; }
+  .hres-head         { font-size: 0.62rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; text-align: center; margin-bottom: 7px; font-weight: 600; }
+  .hres-card-hoy .hres-head { color: var(--accent); font-weight: 700; font-size: 0.68rem; }
+  .hres-row          { margin-bottom: 6px; }
+  .hres-row:last-child { margin-bottom: 0; }
+  .hres-lbl          { font-size: 0.58rem; color: var(--muted); margin-bottom: 1px; }
+  .hres-lbl-temp     { color: var(--temp); }
+  .hres-lbl-wind     { color: var(--wind); }
+  .hres-lbl-rain     { color: var(--rain); }
+  .hres-val          { font-size: 0.68rem; font-weight: 600; color: var(--text); line-height: 1.25; }
+  .hres-val small    { font-size: 0.58rem; font-weight: 400; color: var(--muted); }
+  .hres-card-hoy .hres-val { font-size: 0.78rem; }
+  .hres-vacio        { font-size: 0.66rem; color: var(--muted); text-align: center; padding: 44px 4px; }
+
   #dias-y-grafico { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
   #ultimo-dia-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; }
   .ultimo-dia-title { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
@@ -750,6 +770,11 @@
     .card-label { font-size: 0.58rem; }
     #dias-y-grafico { grid-template-columns: 1fr; }
     .chart-wrap { min-width: 300px; }
+    .chart-wrap-hist { min-width: 0; width: 100%; }
+    .hist-chart-flex { flex-direction: column; }
+    .hist-chart-main { min-width: 0; width: 100%; }
+    .hist-resumen { width: 100%; justify-content: space-between; }
+    .hres-card, .hres-card-hoy { width: auto; flex: 1 1 0; }
     .header-right { display: none; }
     #mobile-header-info { display: flex !important; }
   }
@@ -807,7 +832,7 @@
       <button class="btn-ingresar" onclick="pinReintentar()">Volver a intentar</button>
     </div>
 
-    <div class="login-ver">v16.1.0</div>
+    <div class="login-ver">v16.2.0</div>
   </div>
 </div>
 
@@ -1044,8 +1069,13 @@
           <div class="hist-dias-wrap" id="hist-dias-wrap" style="padding:2px 0 4px;"></div>
         </div>
         <div class="chart-box" id="hist-chart-box" style="margin-top:6px;">
-          <div class="chart-wrap"><canvas id="chartHistorico"></canvas></div>
-          <div class="hist-legend" id="hist-legend"></div>
+          <div class="hist-chart-flex">
+            <div class="hist-chart-main">
+              <div class="chart-wrap chart-wrap-hist"><canvas id="chartHistorico"></canvas></div>
+              <div class="hist-legend" id="hist-legend"></div>
+            </div>
+            <div class="hist-resumen" id="hist-resumen"></div>
+          </div>
         </div>
       </div>
     </div><!-- /panel-historico -->
@@ -1303,7 +1333,7 @@
 <script>
 // ── CONFIGURACION ─────────────────────────────────────────────
 var API_URL     = 'https://script.google.com/macros/s/AKfycbzH5slzkOQ8fvhCt9JXIoMFNxrBZghZv34fowPI2Yk948eTxhZmHFX37InwpnxmkVBU/exec';
-var VERSION_UI  = 'v16.1.0';
+var VERSION_UI  = 'v16.2.0';
 // ─────────────────────────────────────────────────────────────
 
 var chart7Instance      = null;
@@ -2163,6 +2193,7 @@ function poblarMesesHistorico() {
     document.getElementById('hist-dias-wrap').innerHTML = '';
     document.getElementById('hist-dia-fecha').textContent = '-';
     document.getElementById('hist-legend').innerHTML = '<div class="hist-vacio">Sin historial disponible todavia</div>';
+    limpiarResumenTresDias();
     return;
   }
   var meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
@@ -2229,6 +2260,7 @@ function renderDiasHistorico(ym) {
     globalHistoricoDia = null;
     document.getElementById('hist-dia-fecha').textContent = 'Sin registros este mes';
     document.getElementById('hist-legend').innerHTML = '';
+    limpiarResumenTresDias();
     if (chartHistoricoInstance) { chartHistoricoInstance.destroy(); chartHistoricoInstance = null; }
   }
 }
@@ -2265,6 +2297,7 @@ function renderChartHistorico(d) {
   if (chartHistoricoInstance) { chartHistoricoInstance.destroy(); chartHistoricoInstance = null; }
   if (!d || !d.horas || !d.horas.length) {
     document.getElementById('hist-legend').innerHTML = '<div class="hist-vacio">Sin registros horarios para este dia</div>';
+    limpiarResumenTresDias();
     return;
   }
   var horas = d.horas, temps = d.temps, vientos = d.vientos, lluvias = d.lluvias;
@@ -2302,6 +2335,86 @@ function renderChartHistorico(d) {
     { label:'Umbral viento ' + (vientoDP || '-') + ' km/h', color:'#2563eb', dash:true, idx:3 },
     { label:'Umbral lluvia ' + (lluviaDP || '-') + ' mm',   color:'#dc2626', dash:true, idx:4 }
   ]);
+
+  cargarResumenTresDias(d.fecha, d);
+}
+
+// ── HISTORICO — resumen Ayer/Hoy/Manana (v16.2.0) ─────────────
+var resumenReqId = 0;
+
+function sumarDiasISO(iso, delta) {
+  var p  = iso.split('-');
+  var dt = new Date(parseInt(p[0],10), parseInt(p[1],10) - 1, parseInt(p[2],10));
+  dt.setDate(dt.getDate() + delta);
+  return dt.getFullYear() + '-' + pad2(dt.getMonth()+1) + '-' + pad2(dt.getDate());
+}
+
+function calcResumenDia(d) {
+  if (!d || !d.horas || !d.horas.length) return null;
+  var temps = d.temps, vientos = d.vientos, lluvias = d.lluvias;
+  var sum = function(arr) { return arr.reduce(function(a,b){ return a+b; }, 0); };
+  return {
+    tempMax:    Math.round(Math.max.apply(null, temps) * 10) / 10,
+    tempMin:    Math.round(Math.min.apply(null, temps) * 10) / 10,
+    tempProm:   Math.round((sum(temps) / temps.length) * 10) / 10,
+    vientoMax:  Math.round(Math.max.apply(null, vientos)),
+    vientoMin:  Math.round(Math.min.apply(null, vientos)),
+    vientoProm: Math.round(sum(vientos) / vientos.length),
+    lluviaAcum: Math.round(sum(lluvias) * 10) / 10
+  };
+}
+
+// Trae un dia para el resumen reutilizando la cache/accion horasDia ya existente.
+// Nunca rechaza la promesa (error de red o sin datos = null -> tarjeta "sin datos").
+function obtenerDiaHistorico(fecha) {
+  if (globalHistoricoCache[fecha]) return Promise.resolve(globalHistoricoCache[fecha]);
+  return fetch(API_URL + '?action=horasDia&email=' + encodeURIComponent(userEmail) + '&obraId=' + obraSeleccionada.id + '&fecha=' + fecha)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error || !data.horas || !data.horas.length) return null;
+      globalHistoricoCache[fecha] = data;
+      return data;
+    })
+    .catch(function() { return null; });
+}
+
+function cargarResumenTresDias(fecha, dHoy) {
+  var reqId       = ++resumenReqId;
+  var fechaAyer   = sumarDiasISO(fecha, -1);
+  var fechaManana = sumarDiasISO(fecha, 1);
+  Promise.all([ obtenerDiaHistorico(fechaAyer), obtenerDiaHistorico(fechaManana) ])
+    .then(function(res) {
+      if (reqId !== resumenReqId) return; // el usuario ya cambio de dia mientras tanto
+      renderResumenTresDias('ayer', res[0], 'hoy', dHoy, 'mañana', res[1]);
+    });
+}
+
+function limpiarResumenTresDias() {
+  resumenReqId++; // invalida cualquier fetch de vecinos en vuelo
+  var wrap = document.getElementById('hist-resumen');
+  if (wrap) wrap.innerHTML = '';
+}
+
+function renderResumenTresDias(lblAyer, dAyer, lblHoy, dHoy, lblManana, dManana) {
+  var wrap = document.getElementById('hist-resumen');
+  if (!wrap) return;
+  wrap.innerHTML =
+    renderHresCard(lblAyer,   calcResumenDia(dAyer),  false) +
+    renderHresCard(lblHoy,    calcResumenDia(dHoy),   true)  +
+    renderHresCard(lblManana, calcResumenDia(dManana), false);
+}
+
+function renderHresCard(label, r, esHoy) {
+  var cls = 'hres-card' + (esHoy ? ' hres-card-hoy' : '');
+  if (!r) {
+    return '<div class="' + cls + '"><div class="hres-head">' + label + '</div><div class="hres-vacio">sin datos</div></div>';
+  }
+  return '<div class="' + cls + '">' +
+    '<div class="hres-head">' + label + '</div>' +
+    '<div class="hres-row"><div class="hres-lbl hres-lbl-temp">Temp</div><div class="hres-val">' + r.tempMax + '/' + r.tempMin + '&deg;<small> &middot; ' + r.tempProm + '</small></div></div>' +
+    '<div class="hres-row"><div class="hres-lbl hres-lbl-wind">Viento</div><div class="hres-val">' + r.vientoMax + '/' + r.vientoMin + '<small> &middot; ' + r.vientoProm + '</small></div></div>' +
+    '<div class="hres-row"><div class="hres-lbl hres-lbl-rain">Lluvia</div><div class="hres-val">' + r.lluviaAcum + ' mm</div></div>' +
+  '</div>';
 }
 
 function renderHistLegend(defs) {

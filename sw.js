@@ -1,10 +1,10 @@
 // ============================================================
 //  ClimaObra — Service Worker
-//  v16.1.0 — bump de cache por cambio sustancial de index.html
-//            (reemplazo de auth Google por pwa_pin)
+//  v16.2.0 — bump de cache por cambio de index.html
+//            (resumen Ayer/Hoy/Manana en Historico)
 // ============================================================
 
-const CACHE_NAME = 'climaobra-v16-1';
+const CACHE_NAME = 'climaobra-v16-2';
 
 // Archivos a cachear en la instalación
 const ASSETS = [
