@@ -398,6 +398,27 @@
   .hres-card-hoy .hres-val { font-size: 0.78rem; }
   .hres-vacio        { font-size: 0.66rem; color: var(--muted); text-align: center; padding: 44px 4px; }
 
+  /* ── HISTORICO — skeleton/shimmer de carga (v16.5.0) ────────── */
+  @keyframes hist-shimmer {
+    0%   { background-position: 100% 0; }
+    100% { background-position: 0 0; }
+  }
+  .chart-wrap-hist  { position: relative; }
+  .hist-chart-skel  {
+    display: none; position: absolute; inset: 0; border-radius: 8px;
+    background: linear-gradient(90deg, var(--bg) 25%, var(--border) 37%, var(--bg) 63%);
+    background-size: 400% 100%;
+    animation: hist-shimmer 1.4s ease infinite;
+  }
+  .hres-skel        {
+    border-radius: 4px; height: 11px;
+    background: linear-gradient(90deg, var(--bg) 25%, var(--border) 37%, var(--bg) 63%);
+    background-size: 400% 100%;
+    animation: hist-shimmer 1.4s ease infinite;
+  }
+  .hres-skel-lbl     { width: 30px; margin-bottom: 5px; }
+  .hres-skel-val     { width: 68%; }
+
   #dias-y-grafico { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
   #ultimo-dia-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; }
   .ultimo-dia-title { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
@@ -834,7 +855,7 @@
       <button class="btn-ingresar" onclick="pinReintentar()">Volver a intentar</button>
     </div>
 
-    <div class="login-ver">v16.4.0</div>
+    <div class="login-ver">v16.5.0</div>
   </div>
 </div>
 
@@ -1073,7 +1094,10 @@
         <div class="chart-box" id="hist-chart-box" style="margin-top:6px;">
           <div class="hist-chart-flex">
             <div class="hist-chart-main">
-              <div class="chart-wrap chart-wrap-hist"><canvas id="chartHistorico"></canvas></div>
+              <div class="chart-wrap chart-wrap-hist">
+                <canvas id="chartHistorico"></canvas>
+                <div class="hist-chart-skel" id="hist-chart-skel"></div>
+              </div>
               <div class="hist-legend" id="hist-legend"></div>
             </div>
             <div class="hist-resumen" id="hist-resumen"></div>
@@ -1335,7 +1359,7 @@
 <script>
 // ── CONFIGURACION ─────────────────────────────────────────────
 var API_URL     = 'https://script.google.com/macros/s/AKfycbzH5slzkOQ8fvhCt9JXIoMFNxrBZghZv34fowPI2Yk948eTxhZmHFX37InwpnxmkVBU/exec';
-var VERSION_UI  = 'v16.4.0';
+var VERSION_UI  = 'v16.5.0';
 // ─────────────────────────────────────────────────────────────
 
 var chart7Instance      = null;
@@ -2276,32 +2300,49 @@ function seleccionarDiaHistorico(fecha) {
   });
   document.getElementById('hist-dia-fecha').textContent = formatFechaLarga(fecha);
 
-  if (globalHistoricoCache[fecha]) {
-    renderChartHistorico(globalHistoricoCache[fecha]);
+  var fechaAyer   = sumarDiasISO(fecha, -1);
+  var fechaManana = sumarDiasISO(fecha, 1);
+
+  var chartCacheado   = globalHistoricoCache[fecha];
+  var resumenCacheado = globalResumenCache[fecha];
+
+  // Todo ya visitado en esta sesion -> pintar directo, sin red.
+  if (chartCacheado && resumenCacheado) {
+    renderChartHistorico(chartCacheado);
+    renderResumenTresDias(fechaAyer, resumenCacheado[0], fecha, resumenCacheado[1], fechaManana, resumenCacheado[2]);
     return;
   }
 
-  document.getElementById('hist-legend').innerHTML = '<span style="font-size:0.75rem;color:var(--muted);display:flex;align-items:center;"><span class="spinner-sm"></span>Cargando...</span>';
-  fetch(API_URL + '?action=horasDia&email=' + encodeURIComponent(userEmail) + '&obraId=' + obraSeleccionada.id + '&fecha=' + fecha)
+  mostrarSkeletonHistorico(fechaAyer, fecha, fechaManana);
+
+  fetch(API_URL + '?action=diaHistorico&email=' + encodeURIComponent(userEmail) + '&obraId=' + obraSeleccionada.id + '&fecha=' + fecha)
     .then(function(r) { return r.json(); })
     .then(function(data) {
+      if (globalHistoricoDia !== fecha) return; // el usuario ya cambio de dia mientras tanto
       if (data.error) {
+        ocultarSkeletonHistorico();
         document.getElementById('hist-legend').innerHTML = '<span style="font-size:0.75rem;color:#dc2626;">Error: ' + data.error + '</span>';
+        renderResumenTresDias(fechaAyer, null, fecha, null, fechaManana, null);
         return;
       }
-      globalHistoricoCache[fecha] = data;
-      if (globalHistoricoDia === fecha) renderChartHistorico(data); // descarta si el usuario ya cambio de dia
+      globalHistoricoCache[fecha] = data.horas;
+      globalResumenCache[fecha]   = data.resumenes || [null, null, null];
+      renderChartHistorico(data.horas);
+      renderResumenTresDias(fechaAyer, data.resumenes[0], fecha, data.resumenes[1], fechaManana, data.resumenes[2]);
     })
     .catch(function() {
+      if (globalHistoricoDia !== fecha) return;
+      ocultarSkeletonHistorico();
       document.getElementById('hist-legend').innerHTML = '<span style="font-size:0.75rem;color:#dc2626;">Error de conexion</span>';
+      renderResumenTresDias(fechaAyer, null, fecha, null, fechaManana, null);
     });
 }
 
 function renderChartHistorico(d) {
+  ocultarSkeletonHistorico();
   if (chartHistoricoInstance) { chartHistoricoInstance.destroy(); chartHistoricoInstance = null; }
   if (!d || !d.horas || !d.horas.length) {
     document.getElementById('hist-legend').innerHTML = '<div class="hist-vacio">Sin registros horarios para este dia</div>';
-    limpiarResumenTresDias();
     return;
   }
   var horas = d.horas, temps = d.temps, vientos = d.vientos, lluvias = d.lluvias;
@@ -2339,16 +2380,14 @@ function renderChartHistorico(d) {
     { label:'Umbral viento ' + (vientoDP || '-') + ' km/h', color:'#2563eb', dash:true, idx:3 },
     { label:'Umbral lluvia ' + (lluviaDP || '-') + ' mm',   color:'#dc2626', dash:true, idx:4 }
   ]);
-
-  cargarResumenTresDias(d.fecha);
 }
 
-// ── HISTORICO — resumen Ayer/Hoy/Manana (v16.4.0) ─────────────
+// ── HISTORICO — resumen Ayer/Hoy/Manana + skeletons (v16.5.0) ────
 // Cache cliente por fecha (mismo patron que globalHistoricoCache del
-// grafico) + medicion en consola del tiempo real de ida y vuelta al GAS,
-// para poder distinguir "el calculo es lento" de "el round-trip a Apps
-// Script es lento" (que es un costo fijo de infraestructura, no de datos).
-var resumenReqId    = 0;
+// grafico). El grafico y las 3 tarjetas ahora se piden juntos en 1 sola
+// llamada (?action=diaHistorico) y se muestran skeletons con shimmer
+// mientras esa llamada esta en vuelo, en vez del spinner de texto de
+// versiones anteriores.
 var globalResumenCache = {}; // { 'yyyy-MM-dd' (fecha de "hoy"): [resAyer, resHoy, resManana] }
 
 function sumarDiasISO(iso, delta) {
@@ -2358,40 +2397,26 @@ function sumarDiasISO(iso, delta) {
   return dt.getFullYear() + '-' + pad2(dt.getMonth()+1) + '-' + pad2(dt.getDate());
 }
 
-function cargarResumenTresDias(fecha) {
-  var reqId       = ++resumenReqId;
-  var fechaAyer   = sumarDiasISO(fecha, -1);
-  var fechaManana = sumarDiasISO(fecha, 1);
-  var fechas      = [fechaAyer, fecha, fechaManana];
-
-  if (globalResumenCache[fecha]) {
-    console.log('[ClimaObra] resumenDias ' + fecha + ' — cache local, 0ms');
-    var cacheado = globalResumenCache[fecha];
-    renderResumenTresDias(fechaAyer, cacheado[0], fecha, cacheado[1], fechaManana, cacheado[2]);
-    return;
+function mostrarSkeletonHistorico(fechaAyer, fechaHoy, fechaManana) {
+  var skel = document.getElementById('hist-chart-skel');
+  if (skel) skel.style.display = 'block';
+  document.getElementById('hist-legend').innerHTML = '';
+  var wrap = document.getElementById('hist-resumen');
+  if (wrap) {
+    wrap.innerHTML =
+      renderHresCardSkeleton('ayer',   fechaAyer,   false) +
+      renderHresCardSkeleton('hoy',    fechaHoy,    true)  +
+      renderHresCardSkeleton('mañana', fechaManana, false);
   }
+}
 
-  var t0 = performance.now();
-  fetch(API_URL + '?action=resumenDias&email=' + encodeURIComponent(userEmail) + '&obraId=' + obraSeleccionada.id + '&fechas=' + fechas.join(','))
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      var ms = Math.round(performance.now() - t0);
-      console.log('[ClimaObra] resumenDias ' + fecha + ' — ' + ms + 'ms (round-trip al GAS)');
-      if (reqId !== resumenReqId) return; // el usuario ya cambio de dia mientras tanto
-      var res = (data && data.resumenes) || [null, null, null];
-      globalResumenCache[fecha] = res;
-      renderResumenTresDias(fechaAyer, res[0], fecha, res[1], fechaManana, res[2]);
-    })
-    .catch(function() {
-      var ms = Math.round(performance.now() - t0);
-      console.log('[ClimaObra] resumenDias ' + fecha + ' — ERROR a los ' + ms + 'ms');
-      if (reqId !== resumenReqId) return;
-      renderResumenTresDias(fechaAyer, null, fecha, null, fechaManana, null);
-    });
+function ocultarSkeletonHistorico() {
+  var skel = document.getElementById('hist-chart-skel');
+  if (skel) skel.style.display = 'none';
 }
 
 function limpiarResumenTresDias() {
-  resumenReqId++; // invalida cualquier fetch en vuelo
+  ocultarSkeletonHistorico();
   var wrap = document.getElementById('hist-resumen');
   if (wrap) wrap.innerHTML = '';
 }
@@ -2417,6 +2442,14 @@ function renderHresCard(label, fechaIso, r, esHoy) {
     '<div class="hres-row"><div class="hres-lbl hres-lbl-rain">Lluvia</div><div class="hres-val">' + r.lluviaAcum + ' mm</div></div>' +
   '</div>';
 }
+
+function renderHresCardSkeleton(label, fechaIso, esHoy) {
+  var cls    = 'hres-card' + (esHoy ? ' hres-card-hoy' : '');
+  var header = '<div class="hres-head">' + label + '<span class="hres-head-fecha">' + formatFechaCorta(fechaIso) + '</span></div>';
+  var fila   = '<div class="hres-row"><div class="hres-skel hres-skel-lbl"></div><div class="hres-skel hres-skel-val"></div></div>';
+  return '<div class="' + cls + '">' + header + fila + fila + fila + '</div>';
+}
+
 
 function renderHistLegend(defs) {
   var wrap = document.getElementById('hist-legend');
